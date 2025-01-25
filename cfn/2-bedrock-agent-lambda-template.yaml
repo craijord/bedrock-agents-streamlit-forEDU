@@ -39,6 +39,10 @@ Resources:
                 Action:
                   - 'sqs:SendMessage'
                 Resource: !GetAtt ActionCallDLQ.Arn
+              - Effect: Allow
+                Action:
+                  - 'lambda:InvokeFunction'
+                Resource: arn:aws:lambda:us-east-1:339712923430:function:getCourseList
 
   # IAM Managed Policy for Lambda Invocation
   LambdaInvokePolicy:
@@ -85,83 +89,123 @@ Resources:
       Timeout: 60
       DeadLetterConfig:
         TargetArn: !GetAtt ActionCallDLQ.Arn
+      Layers:
+        - arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python312:16
       Code:
         ZipFile: |
           import json
+          import pandas as pd
+
+
+          import boto3
+          import os
+
+
+
 
           def lambda_handler(event, context):
               print(event)
-            
+
               # Mock data for demonstration purposes
-              company_data = [
-                  #Technology Industry
-                  {"companyId": 1, "companyName": "TechStashNova Inc.", "industrySector": "Technology", "revenue": 10000, "expenses": 3000, "profit": 7000, "employees": 10},
-                  {"companyId": 2, "companyName": "QuantumPirateLeap Technologies", "industrySector": "Technology", "revenue": 20000, "expenses": 4000, "profit": 16000, "employees": 10},
-                  {"companyId": 3, "companyName": "CyberCipherSecure IT", "industrySector": "Technology", "revenue": 30000, "expenses": 5000, "profit": 25000, "employees": 10},
-                  {"companyId": 4, "companyName": "DigitalMyricalDreams Gaming", "industrySector": "Technology", "revenue": 40000, "expenses": 6000, "profit": 34000, "employees": 10},
-                  {"companyId": 5, "companyName": "NanoMedNoLand Pharmaceuticals", "industrySector": "Technology", "revenue": 50000, "expenses": 7000, "profit": 43000, "employees": 10},
-                  {"companyId": 6, "companyName": "RoboSuperBombTech Industries", "industrySector": "Technology", "revenue": 60000, "expenses": 8000, "profit": 52000, "employees": 12},
-                  {"companyId": 7, "companyName": "FuturePastNet Solutions", "industrySector": "Technology",  "revenue": 60000, "expenses": 9000, "profit": 51000, "employees": 10},
-                  {"companyId": 8, "companyName": "InnovativeCreativeAI Corp", "industrySector": "Technology", "revenue": 65000, "expenses": 10000, "profit": 55000, "employees": 15},
-                  {"companyId": 9, "companyName": "EcoLeekoTech Energy", "industrySector": "Technology", "revenue": 70000, "expenses": 11000, "profit": 59000, "employees": 10},
-                  {"companyId": 10, "companyName": "TechyWealthHealth Systems", "industrySector": "Technology", "revenue": 80000, "expenses": 12000, "profit": 68000, "employees": 10},
-              
-                  #Real Estate Industry
-                  {"companyId": 11, "companyName": "LuxuryToNiceLiving Real Estate", "industrySector": "Real Estate", "revenue": 90000, "expenses": 13000, "profit": 77000, "employees": 10},
-                  {"companyId": 12, "companyName": "UrbanTurbanDevelopers Inc.", "industrySector": "Real Estate", "revenue": 100000, "expenses": 14000, "profit": 86000, "employees": 10},
-                  {"companyId": 13, "companyName": "SkyLowHigh Towers", "industrySector": "Real Estate", "revenue": 110000, "expenses": 15000, "profit": 95000, "employees": 18},
-                  {"companyId": 14, "companyName": "GreenBrownSpace Properties", "industrySector": "Real Estate", "revenue": 120000, "expenses": 16000, "profit": 104000, "employees": 10},
-                  {"companyId": 15, "companyName": "ModernFutureHomes Ltd.", "industrySector": "Real Estate", "revenue": 130000, "expenses": 17000, "profit": 113000, "employees": 10},
-                  {"companyId": 16, "companyName": "CityCountycape Estates", "industrySector": "Real Estate", "revenue": 140000, "expenses": 18000, "profit": 122000, "employees": 10},
-                  {"companyId": 17, "companyName": "CoastalFocalRealty Group", "industrySector": "Real Estate", "revenue": 150000, "expenses": 19000, "profit": 131000, "employees": 10},
-                  {"companyId": 18, "companyName": "InnovativeModernLiving Spaces", "industrySector": "Real Estate", "revenue": 160000, "expenses": 20000, "profit": 140000, "employees": 10},
-                  {"companyId": 19, "companyName": "GlobalRegional Properties Alliance", "industrySector": "Real Estate", "revenue": 170000, "expenses": 21000, "profit": 149000, "employees": 11},
-                  {"companyId": 20, "companyName": "NextGenPast Residences", "industrySector": "Real Estate", "revenue": 180000, "expenses": 22000, "profit": 158000, "employees": 260}
-              ]
-              
-            
+              bottom3_concern = [
+                  {
+                      "college_id": "CC",
+                      "student_id": 128412,
+                      "first_name": "Wynter-Violet",
+                      "last_name": "Lalumia",
+                      "email_address": "Wynter-Violet.Lalumia_811@example.com",
+                      "phone_number": "555-XXX-XXXX",
+                      "declared_program": "CCPARAAS",
+                      "declared_degree": "AS",
+                      "declared_major": "Paralegal Studies",
+                      "major_name": "Paralegal Studies",
+                      "student_class": "First year",
+                      "graduate_year": 2026,
+                      "current_gpa": 3.12,
+                      "credits_earned": 12,
+                      "curr_alignment_score": 39,
+                      "next_alignment_score": 41,
+                      "poss_alignment_score": 80
+                  },
+                  {
+                      "college_id": "CC",
+                      "student_id": 129398,
+                      "first_name": "Jasmin",
+                      "last_name": "Wilby",
+                      "email_address": "Jasmin.Wilby_975@example.com",
+                      "phone_number": "555-XXX-XXXX",
+                      "declared_program": "CGWLDTAS",
+                      "declared_degree": "AS",
+                      "declared_major": "Welding Tech",
+                      "major_name": "Welding Tech",
+                      "student_class": "Second year",
+                      "graduate_year": 2025,
+                      "current_gpa": 3.66,
+                      "credits_earned": 54,
+                      "curr_alignment_score": 61,
+                      "next_alignment_score": 63,
+                      "poss_alignment_score": 81
+                  },
+                  {
+                      "college_id": "CC",
+                      "student_id": 132811,
+                      "first_name": "Irvine",
+                      "last_name": "Boneparte",
+                      "email_address": "Irvine.Boneparte_363@example.com",
+                      "phone_number": "555-XXX-XXXX",
+                      "declared_program": "CGVNRSAS",
+                      "declared_degree": "AS",
+                      "declared_major": "Vocational Nursing",
+                      "major_name": "Vocational Nursing",
+                      "student_class": "First year",
+                      "graduate_year": 2026,
+                      "current_gpa": 3.11,
+                      "credits_earned": 21,
+                      "curr_alignment_score": 31,
+                      "next_alignment_score": 33,
+                      "poss_alignment_score": 58
+                  }
+                  ]
+
+
               def get_named_parameter(event, name):
                   return next(item for item in event['parameters'] if item['name'] == name)['value']
+
+              def get_named_property(event, name):
+                  return next(item for item in event['requestBody']['content']['application/json']['properties'] if item['name'] == name)['value']
+
+              def getPriorityStudents(event):
+                  return bottom3_concern
               
-          
-              def companyResearch(event):
-                  companyName = get_named_parameter(event, 'name').lower()
-                  print("NAME PRINTED: ", companyName)
+              def getStudentProfile(event, student_id):
+                  for student in bottom3_concern:
+                      if student['student_id'] == int(student_id):
+                          return student
+
+                  return "No student found with the given ID." + student_id
+
+              def getCourseList(event, context):
+                  # Initialize Lambda client
+                  lambda_client = boto3.client('lambda')
                   
-                  for company_info in company_data:
-                      if company_info["companyName"].lower() == companyName:
-                          return company_info
-                  return None
+                  try:
+                      # Call the getCourseList Lambda function
+                      response = lambda_client.invoke(
+                          FunctionName='getCourseList',
+                          InvocationType='RequestResponse',  # Synchronous invocation
+                          Payload=json.dumps(event)  # Pass through the original event
+                      )
+                      
+                      # Read and parse the response payload
+                      response_payload = json.loads(response['Payload'].read())
+                      
+                      return response_payload
+                      
+                  except Exception as e:
+                      print("FAILED IN SECOND INVOKE")
+                      print(e)
+                      e
               
-              def createPortfolio(event, company_data):
-                  numCompanies = int(get_named_parameter(event, 'numCompanies'))
-                  industry = get_named_parameter(event, 'industry').lower()
-
-                  industry_filtered_companies = [company for company in company_data
-                                                if company['industrySector'].lower() == industry]
-
-                  sorted_companies = sorted(industry_filtered_companies, key=lambda x: x['profit'], reverse=True)
-
-                  top_companies = sorted_companies[:numCompanies]
-                  return top_companies
-
-          
-              def sendEmail(event, company_data):
-                  emailAddress = get_named_parameter(event, 'emailAddress')
-                  fomcSummary = get_named_parameter(event, 'fomcSummary')
-              
-                  # Retrieve the portfolio data as a string
-                  portfolioDataString = get_named_parameter(event, 'portfolio')
-              
-
-                  # Prepare the email content
-                  email_subject = "Portfolio Creation Summary and FOMC Search Results"
-                  #email_body = f"FOMC Search Summary:\n{fomcSummary}\n\nPortfolio Details:\n{json.dumps(portfolioData, indent=4)}"
-              
-                  # Email sending code here (commented out for now)
-              
-                  return "Email sent successfully to {}".format(emailAddress)   
-                
                 
               result = ''
               response_code = 200
@@ -170,12 +214,13 @@ Resources:
               
               print("api_path: ", api_path )
               
-              if api_path == '/companyResearch':
-                  result = companyResearch(event)
-              elif api_path == '/createPortfolio':
-                  result = createPortfolio(event, company_data)
-              elif api_path == '/sendEmail':
-                  result = sendEmail(event, company_data)
+              if api_path == '/bottom3':
+                  result = getPriorityStudents(event)
+              elif api_path == '/student':
+                  student_id = get_named_parameter(event, 'student_id')
+                  result = getStudentProfile(event, student_id)
+              elif api_path == '/recommended_courses':
+                  result = getCourseList(event, context)
               else:
                   response_code = 404
                   result = f"Unrecognized api path: {action_group}::{api_path}"
@@ -197,6 +242,7 @@ Resources:
               api_response = {'messageVersion': '1.0', 'response': action_response}
               return api_response
 
+
   # Lambda Permission for Bedrock to Invoke Lambda
   LambdaInvokePermission:
     Type: 'AWS::Lambda::Permission'
@@ -212,30 +258,45 @@ Resources:
     Type: "AWS::Bedrock::Agent"
     DependsOn: LambdaInvokePermission
     Properties:
-      AgentName: !Sub 'PortfolioCreator-${AWS::AccountId}'
+      AgentName: !Sub 'CCAdvisorAssist-${AWS::AccountId}'
       AgentResourceRoleArn: !GetAtt BedrockAgentExecutionRole.Arn
       AutoPrepare: 'True'
       FoundationModel: 'anthropic.claude-3-haiku-20240307-v1:0'
       Instruction: |
-        You are an investment analyst. Your job is to assist in investment analysis, create research summaries, generate profitable company portfolios, and facilitate communication through emails. Here is how I want you to think step by step:
+        You are an community college advisor. Your job is to assist in reviewing student enrollment plans, recommend courses that are will help them complete their degrees, and gather course information to provide a detailed descripiton of each recommended course. Here is how I want you to think step by step:
 
-        1. Portfolio Creation:
-            Analyze the user's request to extract key information such as the desired number of companies and industry. 
-            Based on the criteria from the request, create a portfolio of companies. Use the template provided to format the portfolio.
+        1. Understanding the user request:
+            Analyze the user's request to determine if they are asking for the students which the lowest alignment scores that they should prioritize or if they are
+            asking about the details for a specific student.  If they are asking about the students least aligned to their degree, then use the getPriorityStudents api.
+            If they are asking about a specific student, then use the getStudentProfile api.
 
-        2. Company Research and Document Summarization:
-            For each company in the portfolio, conduct detailed research to gather relevant financial and operational data.
-            When a document, like the FOMC report, is mentioned, retrieve the document and provide a concise summary.
+        2. Provide details about a list of students
+            Use the template provided when providing a list of students to the user in a simple markown table format.
 
-        3. Email Communication:
-            Using the email template provided, format an email that includes the newly created company portfolio and any summaries of important documents.
-            Utilize the provided tools to send an email upon request, That includes a summary of provided responses and portfolios created.
+        3. Provide inividual student details:
+            Use the template provided to organize the details about a specific student.  Offer to enroll the student in the recommended courses.
+            Offer to gather course descriptions for the recommended courses.
+
+        4. Provide recommended courses:
+            Use the recommended_courses api to get information about the specific courses that are recommended for a student. 
+            Provide these back to the user using the list_of_courses template provided.
             
-      Description: "Generative AI Investment Analyst Tool for creating portfolios and summarizing documents."
+        5. When asked to provide details about a course
+            Use the knowledge base(s) you have access to to find that information using the course ID as search
+            terms.  Do not invent information about the courses, provide only what you find in the knowledge base.  If you cannot find
+            course details in the knowledge base, please reply that you were unable to locate information about the course and provide the course
+            ID you used to search.
+
+        6. Provide a summary report for the student
+          When asked to provide a consolidated, or 1-page, report for the student please use the handout_for_student template to organize informaiton about each of the 
+          recommended courses.  At the top of the reporting include the details about the student themselves such as name, GPA, program of student, current alignment, and the 
+          alignment score that would result from taking the recommmended courses
+            
+      Description: "Generative AI assistant for community college advisors to use when creating academic plans."
       IdleSessionTTLInSeconds: 900
       ActionGroups:
-        - ActionGroupName: "PortfolioCreator-actions"
-          Description: "This action group is used to query information about customers and procedures."
+        - ActionGroupName: "CCAdvisor-actions"
+          Description: "This action group is used to gather information to support an advisor in academic planning."
           ActionGroupExecutor:
             Lambda: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:ActionCall-${AWS::AccountId}'
           ApiSchema:
@@ -243,33 +304,23 @@ Resources:
               {
                 "openapi": "3.0.1",
                 "info": {
-                  "title": "PortfolioCreatorAssistant API",
-                  "description": "API for creating a company portfolio, search company data, and send summarized emails",
+                  "title": "CCAdvisor API",
+                  "description": "API for gathering data and managing academic plans",
                   "version": "1.0.0"
                 },
                 "paths": {
-                  "/companyResearch": {
+                  "/bottom3": {
                     "post": {
-                      "description": "Get financial data for a company by name",
-                      "operationId": "companyResearch",
-                      "parameters": [
-                        {
-                          "name": "name",
-                          "in": "query",
-                          "description": "Name of the company to research",
-                          "required": true,
-                          "schema": {
-                            "type": "string"
-                          }
-                        }
-                      ],
+                      "description": "Get info about the students with the lowest alignment scores for the advisor to review.  These are priority students to engage with.",
+                      "operationId": "bottom3",
+                      "parameters": [],
                       "responses": {
                         "200": {
-                          "description": "Successful response with company data",
+                          "description": "Successful response with priority student data",
                           "content": {
                             "application/json": {
                               "schema": {
-                                "$ref": "#/components/schemas/CompanyData"
+                                "$ref": "#/components/schemas/student_list"
                               }
                             }
                           }
@@ -277,38 +328,29 @@ Resources:
                       }
                     }
                   },
-                  "/createPortfolio": {
+                  "/student": {
                     "post": {
-                      "description": "Create a company portfolio of top profit earners by specifying number of companies and industry",
-                      "operationId": "createPortfolio",
+                      "description": "Get details about a specific student",
+                      "operationId": "student",
                       "parameters": [
                         {
-                          "name": "numCompanies",
+                          "name": "student_id",
                           "in": "query",
-                          "description": "Number of companies to include in the portfolio",
+                          "description": "The numeric id for a student",
                           "required": true,
                           "schema": {
                             "type": "integer",
                             "format": "int32"
                           }
-                        },
-                        {
-                          "name": "industry",
-                          "in": "query",
-                          "description": "Industry sector for the portfolio companies",
-                          "required": true,
-                          "schema": {
-                            "type": "string"
-                          }
                         }
                       ],
                       "responses": {
                         "200": {
-                          "description": "Successful response with generated portfolio",
+                          "description": "Successful response with student details",
                           "content": {
                             "application/json": {
                               "schema": {
-                                "$ref": "#/components/schemas/Portfolio"
+                                "$ref": "#/components/schemas/student"
                               }
                             }
                           }
@@ -316,48 +358,29 @@ Resources:
                       }
                     }
                   },
-                  "/sendEmail": {
+                  "/recommended_courses": {
                     "post": {
-                      "description": "Send an email with FOMC search summary and created portfolio",
-                      "operationId": "sendEmail",
+                      "description": "Get recommended courses for a student to improve their pathway alignment",
+                      "operationId": "recommendedCourses",
                       "parameters": [
                         {
-                          "name": "emailAddress",
+                          "name": "student_id",
                           "in": "query",
-                          "description": "Recipient's email address",
+                          "description": "The numeric id for a student",
                           "required": true,
                           "schema": {
-                            "type": "string",
-                            "format": "email"
-                          }
-                        },
-                        {
-                          "name": "fomcSummary",
-                          "in": "query",
-                          "description": "Summary of FOMC search results",
-                          "required": true,
-                          "schema": {
-                            "type": "string"
-                          }
-                        },
-                        {
-                          "name": "portfolio",
-                          "in": "query",
-                          "description": "Details of the created stock portfolio",
-                          "required": true,
-                          "schema": {
-                            "$ref": "#/components/schemas/Portfolio"
+                            "type": "integer",
+                            "format": "int32"
                           }
                         }
                       ],
                       "responses": {
                         "200": {
-                          "description": "Email sent successfully",
+                          "description": "Course list retrieved successfully",
                           "content": {
-                            "text/plain": {
+                            "application/json": {
                               "schema": {
-                                "type": "string",
-                                "description": "Confirmation message"
+                                "$ref": "#/components/schemas/course_list"
                               }
                             }
                           }
@@ -368,38 +391,140 @@ Resources:
                 },
                 "components": {
                   "schemas": {
-                    "CompanyData": {
+                    "student": {
                       "type": "object",
-                      "description": "Financial data for a single company",
+                      "description": "Data for a single student",
                       "properties": {
-                        "name": {
+                        "college_id": {
                           "type": "string",
-                          "description": "Company name"
+                          "description": "Student's College Code"
                         },
-                        "expenses": {
+                        "student_id": {
+                          "type": "number",
+                          "format": "int32",
+                          "description": "Student's unique ID"
+                        },
+                        "first_name": {
                           "type": "string",
-                          "description": "Annual expenses"
+                          "description": "Student's first name"
                         },
-                        "revenue": {
-                          "type": "number",
-                          "description": "Annual revenue"
+                        "last_name": {
+                          "type": "string",
+                          "description": "Student's last name"
                         },
-                        "profit": {
+                        "email_address": {
+                          "type": "string",
+                          "description": "Student's first name"
+                        },
+                        "phone_number": {
+                          "type": "string",
+                          "description": "Student's phone number"
+                        },
+                        "declared_program": {
+                          "type": "string",
+                          "description": "Student's declared program of study"
+                        },
+                        "declared_degree": {
+                          "type": "string",
+                          "description": "Student's declared degree intent"
+                        },
+                        "declared_major": {
+                          "type": "string",
+                          "description": "Student's declared major short code"
+                        },
+                        "major_name": {
+                          "type": "string",
+                          "description": "Student's declared major name"
+                        },
+                        "student_class": {
+                          "type": "string",
+                          "description": "Student's cohort"
+                        },
+                        "graduate_year": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "Anticipated graduation year"
+                        },
+                        "current_gpa": {
                           "type": "number",
-                          "description": "Annual profit"
+                          "format": "float",
+                          "description": "The student's current cumulative GPA"
+                        },
+                        "credits_earned": {
+                          "type": "number",
+                          "format": "float",
+                          "description": "The number of credits the student has already earned"
+                        },
+                        "curr_alignment_score": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "The alignment score resulting from courses already completed"
+                        },
+                        "next_alignment_score": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "The alignment score resulting from taking the courses the student is currently enrolled for"
+                        },
+                        "poss_alignment_score": {
+                          "type": "integer",
+                          "format": "int32",
+                          "description": "The alignment score resulting from taking the recommended courses"
                         }
                       }
                     },
-                    "Portfolio": {
+                    "course": {
                       "type": "object",
-                      "description": "Stock portfolio with specified number of companies",
+                      "description": "Data for a single student",
+                      "properties": {
+                        "college_id": {
+                          "type": "string",
+                          "description": "College Code for the course"
+                        },
+                        "program": {
+                          "type": "string",
+                          "description": "The short code for he program of study the course is related to"
+                        },
+                        "course_id": {
+                          "type": "string",
+                          "description": "The course ID"
+                        },
+                        "course_subject": {
+                          "type": "string",
+                          "description": "The short code for the subject of the course"
+                        },
+                        "course_subject_desc": {
+                          "type": "string",
+                          "description": "The name of the subject the course is part of"
+                        },
+                        "course_name": {
+                          "type": "string",
+                          "description": "The name of the course"
+                        }
+                      }
+                    },
+                    "course_list": {
+                      "type": "object",
+                      "description": "List of course details",
                       "properties": {
                         "companies": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/CompanyData"
+                            "$ref": "#/components/schemas/course"
                           },
-                          "description": "List of companies in the portfolio"
+                          "description": "List of courses"
+                        }
+                      }
+                    },
+                    "student_list": {
+                      "type": "object",
+                      "description": "List of student details",
+                      "properties": {
+                        "companies": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/student"
+                          },
+                          "description": "List of students"
                         }
                       }
                     }
@@ -431,38 +556,44 @@ Resources:
                       $tools$
                     </functions>
 
-                    Here is an example of a company portfolio.  
+                    Here is an example of a student profile.  
 
-                    <portfolio_example>
+                    <student_example>
 
-                    Here is a portfolio of the top 3 real estate companies:
+                    Irvine Boneparte (132811) is a student a Octank College (CC campus).  He is a first year student pursuing an AS degree in 
+                    Vocational Nursing. His current GPA is 3.11.  Based on courses completed so far, his degree alignment score 
+                    is 31 (on a scale from 0 to 100), which is low even for a first year student.  If he completes the courses he is 
+                    registered for is alignment score will only improve to a 33.  However, by completing the recommended courses instead
+                    he could improve his alignment score to 58.
 
-                      1. NextGenPast Residences with revenue of $180,000, expenses of $22,000 and profit of $158,000 employing 260 people. 
-                      
-                      2. GlobalRegional Properties Alliance with revenue of $170,000, expenses of $21,000 and profit of $149,000 employing 11 people.
-                      
-                      3. InnovativeModernLiving Spaces with revenue of $160,000, expenses of $20,000 and profit of $140,000 employing 10 people.
+                    </student_example>
 
-                    </portfolio_example>
+                    Here is a list of students in a simple markdown table format 
 
-                    Here is an example of an email formatted. 
+                    <student_list>
+                    |id|lastname|firstname|current alignment|enrolled alignment|recommended alignment|
+                    |132811|Boneparte|Irvine|31|33|58|
 
-                    <email_format>
+                    </student_list>
 
-                    Company Portfolio:
+                    <list_of_courses>
+                        | Course ID | Course Subject | Course Subject Description | Course Name 
+                        | :-------: | :------------: | :-----------------------: | :---------: | :----------------: |
+                        | HCRS010   | HCRS (Health Careers) | Health Careers | 
+                    </list_of_courses>
 
-                      1. NextGenPast Residences with revenue of $180,000, expenses of $22,000 and profit of $158,000 employing 260 people. 
-                      
-                      2. GlobalRegional Properties Alliance with revenue of $170,000, expenses of $21,000 and profit of $149,000 employing 11 people.
-                      
-                      3. InnovativeModernLiving Spaces with revenue of $160,000, expenses of $20,000 and profit of $140,000 employing 10 people.  
+                    <handout_for_student>
+                        | Course ID | Course Subject | Course Subject Description | Course Name 
+                        | :-------: | :------------: | :-----------------------: | :---------: | :----------------: |
+                        | HCRS010   | HCRS (Health Careers) | Health Careers | 
 
-                    FOMC Report:
+                        ##Course Description:##
+                        This introductory course provides an overview of the various healthcare professions and the educational pathways to pursue them. s will explore a wide range of career options in the healthcare field, including nursing, medical assisting, pharmacy, respiratory therapy, medical imaging, and more.
 
-                      Participants noted that recent indicators pointed to modest growth in spending and production. Nonetheless, job gains had been robust in recent months, and the unemployment rate remained low. Inflation had eased somewhat but remained elevated.
-                      
-                      Participants recognized that Russia’s war against Ukraine was causing tremendous human and economic hardship and was contributing to elevated global uncertainty. Against this background, participants continued to be highly attentive to inflation risks.
-                    </email_format>
+                        Through lectures, guest speakers, and hands-on activities, students will learn about the job duties, educational requirements, licensure/certification, and career outlook for each healthcare profession. The course aims to help s identify their interests and aptitudes, and determine which healthcare career path might be the best fit for them.
+
+                        ### Key topics covered in this course include:
+                    </handout_for_student>
 
                     You will ALWAYS follow the below guidelines when you are answering a question:
                     <guidelines>
